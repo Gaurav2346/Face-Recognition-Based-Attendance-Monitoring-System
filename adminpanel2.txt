@@ -1,0 +1,177 @@
+import tkinter as tk
+from tkinter import ttk, simpledialog, messagebox
+import pandas as pd
+import os
+import csv
+
+# Constants
+ADMIN_CREDENTIALS_FILE = "admin_credentials.csv"
+MAX_ADMINS = 5  # Maximum number of admins allowed
+
+# Load Admins from File
+def load_admins():
+    if not os.path.exists(ADMIN_CREDENTIALS_FILE):
+        return {}
+
+    admins = {}
+    with open(ADMIN_CREDENTIALS_FILE, "r") as file:
+        reader = csv.reader(file)
+        next(reader, None)  # Skip header
+        for row in reader:
+            if len(row) == 2:
+                admins[row[0]] = row[1]  # Store as {username: password}
+    return admins
+
+# Save Admins to File
+def save_admins(admins):
+    with open(ADMIN_CREDENTIALS_FILE, "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Username", "Password"])
+        for username, password in admins.items():
+            writer.writerow([username, password])
+
+# Setup Admins
+def setup_admins():
+    messagebox.showinfo("Admin Setup", "Register up to 5 admins.")
+    admins = {}
+
+    for i in range(MAX_ADMINS):
+        username = simpledialog.askstring("Admin Registration", f"Enter Admin {i+1} Username:")
+        if not username:
+            continue
+        if username in admins:
+            messagebox.showwarning("Duplicate", "Username already exists. Try again.")
+            continue
+        password = simpledialog.askstring("Admin Registration", "Enter Password:", show="*")
+        admins[username] = password
+        if len(admins) == MAX_ADMINS:
+            break
+
+    save_admins(admins)
+    messagebox.showinfo("Setup Complete", "Admins registered successfully!")
+
+# Role Selection UI
+def ask_user_role():
+    login_window = tk.Toplevel()
+    login_window.title("User Selection")
+    login_window.geometry("350x250")
+    login_window.configure(bg="#f0f0f0")
+
+    tk.Label(login_window, text="Select Your Role:", font=('Arial', 14, 'bold'), bg="#f0f0f0").pack(pady=15)
+
+    tk.Button(login_window, text="Admin", width=20, font=("Arial", 12), bg="#007BFF", fg="white",
+              command=lambda: admin_login(login_window)).pack(pady=10)
+    
+    tk.Button(login_window, text="Student", width=20, font=("Arial", 12), bg="#28A745", fg="white",
+              command=lambda: student_attendance_page(login_window)).pack(pady=10)
+
+# Admin Login UI
+def admin_login(login_window):
+    admins = load_admins()
+    if not admins:
+        setup_admins()
+        admins = load_admins()
+
+    username = simpledialog.askstring("Admin Login", "Enter Username:", parent=login_window)
+    if username not in admins:
+        messagebox.showerror("Access Denied", "Username not found.", parent=login_window)
+        return
+
+    password = simpledialog.askstring("Admin Login", "Enter Password:", show="*", parent=login_window)
+    if password == admins[username]:
+        messagebox.showinfo("Login Successful", f"Welcome, {username}!", parent=login_window)
+        login_window.destroy()
+        open_admin_panel()
+    else:
+        messagebox.showerror("Access Denied", "Incorrect password.", parent=login_window)
+        admin_login(login_window)
+
+# Admin Panel UI
+def open_admin_panel():
+    admin_window = tk.Toplevel(window)
+    admin_window.title("Admin Panel")
+    admin_window.geometry("700x500")
+    admin_window.configure(bg="#f0f0f0")
+
+    tk.Label(admin_window, text="Admin Attendance Records", font=('Arial', 16, 'bold'), bg="#f0f0f0").pack(pady=10)
+
+    # Table View
+    frame = tk.Frame(admin_window)
+    frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+    tv = ttk.Treeview(frame, columns=('ID', 'Name', 'Attendance', 'Percentage'), show='headings')
+    tv.heading('ID', text='Student ID')
+    tv.heading('Name', text='Name')
+    tv.heading('Attendance', text='Total Present')
+    tv.heading('Percentage', text='Percentage (%)')
+
+    tv.column('ID', width=100, anchor='center')
+    tv.column('Name', width=200, anchor='center')
+    tv.column('Attendance', width=120, anchor='center')
+    tv.column('Percentage', width=120, anchor='center')
+
+    tv.pack(fill=tk.BOTH, expand=True)
+
+    attendance_data = calculate_attendance()
+    for student_id, data in attendance_data.items():
+        tv.insert("", "end", values=(student_id, data['name'], data['present'], f"{data['percentage']:.2f}%"))
+
+    # Quit Button
+    tk.Button(admin_window, text="Close", width=15, font=("Arial", 12), bg="#DC3545", fg="white",
+              command=admin_window.destroy).pack(pady=10)
+
+# Student Attendance Page
+def student_attendance_page(login_window):
+    messagebox.showinfo("Student Page", "Redirecting to the Attendance Page...", parent=login_window)
+    login_window.destroy()
+
+# Calculate Attendance
+def calculate_attendance():
+    attendance_folder = "Attendance"
+    student_details_file = "StudentDetails/StudentDetails.csv"
+
+    if not os.path.exists(student_details_file):
+        return {}
+
+    df_students = pd.read_csv(student_details_file)
+    student_dict = {str(row["ID"]).strip(): {"name": str(row["NAME"]).strip(), "present": 0} for _, row in df_students.iterrows()}
+
+    total_classes = 0
+    for file in os.listdir(attendance_folder):
+        if file.startswith("Attendance_") and file.endswith(".csv"):
+            total_classes += 1
+            df_attendance = pd.read_csv(os.path.join(attendance_folder, file))
+            for _, row in df_attendance.iterrows():
+                student_id = str(row["Id"]).strip()
+                if student_id in student_dict:
+                    student_dict[student_id]["present"] += 1
+
+    for student_id, data in student_dict.items():
+        data["percentage"] = (data["present"] / total_classes) * 100 if total_classes > 0 else 0
+
+    return student_dict
+
+# Main Window
+window = tk.Tk()
+window.geometry("450x400")
+window.title("Attendance System")
+window.configure(bg="#2D3748")
+
+tk.Label(window, text="Face Recognition Based Attendance System", fg="white", bg="#2D3748",
+         font=('Arial', 14, 'bold')).pack(pady=15)
+
+tk.Button(window, text="Login as Admin", width=25, font=("Arial", 12), bg="#007BFF", fg="white",
+          command=ask_user_role).pack(pady=10)
+
+tk.Button(window, text="Login as Student", width=25, font=("Arial", 12), bg="#28A745", fg="white",
+          command=ask_user_role).pack(pady=10)
+
+tk.Button(window, text="Exit", width=25, font=("Arial", 12), bg="#DC3545", fg="white",
+          command=window.quit).pack(pady=10)
+
+# First-time Admin Setup
+if not os.path.exists(ADMIN_CREDENTIALS_FILE) or os.stat(ADMIN_CREDENTIALS_FILE).st_size == 0:
+    setup_admins()
+
+# Run the Application
+window.mainloop()
