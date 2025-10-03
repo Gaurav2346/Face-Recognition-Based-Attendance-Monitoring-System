@@ -14,3 +14,5 @@ FEATURES:
 3) Creates/Updates CSV file for deatils of students on registration.
 4) Creates a new CSV file everyday for attendance and marks attendance with proper date and time.
 5) Displays live attendance updates for the day on the main screen in tabular format with Id, name, date and time.
+<img width="1919" height="1000" alt="Screenshot 2025-03-31 144513" src="https://github.com/user-attachments/assets/9f8a7cbe-cffc-4e88-8a32-40313c16820b" />
+
